@@ -1,41 +1,56 @@
 pipeline {
 	agent any
 
+	tools {
+		maven 'maven3'
+	}
+
 	environment {
-		DOCKER_IMAGE = "hajarhaoud/spring-app"
-		DOCKER_HUB_CREDS = 'docker-hub-credentials'
+		DOCKER_USER = 'hajarhaoud'
+		IMAGE_NAME = 'spring-app'
+		IMAGE_TAG = "${env.BUILD_NUMBER}"
 	}
 
 	stages {
-		stage('Checkout Code') {
+		stage('1. Checkout') {
 			steps {
 				git branch: 'main', url: 'https://github.com/HajarHaoud/pipeline-spring.git'
 			}
 		}
 
-		stage('Build Artifact') {
+		stage('2. Build Maven') {
 			steps {
-				sh 'mvn clean package -DskipTests'
+				// On entre dans le sous-dossier où se trouve le pom.xml
+				dir('spring-pipeline') {
+					sh 'mvn clean package -DskipTests'
+				}
 			}
 		}
 
-		stage('Build & Push Docker Image') {
+		stage('3. Build & Push Docker') {
 			steps {
 				script {
-					docker.withRegistry('', DOCKER_HUB_CREDS) {
-						def customImage = docker.build("${DOCKER_IMAGE}:${env.BUILD_ID}")
-						customImage.push()
-						customImage.push('latest')
+					// On entre aussi dans le dossier où se trouve le Dockerfile
+					dir('spring-pipeline') {
+						withCredentials([usernamePassword(credentialsId: 'docker-hub-creds', passwordVariable: 'PASS', usernameVariable: 'USER')]) {
+							sh "docker build -t ${DOCKER_USER}/${IMAGE_NAME}:${IMAGE_TAG} ."
+							sh "echo $PASS | docker login -u $USER --password-stdin"
+							sh "docker push ${DOCKER_USER}/${IMAGE_NAME}:${IMAGE_TAG}"
+							sh "docker push ${DOCKER_USER}/${IMAGE_NAME}:latest"
+						}
 					}
 				}
 			}
 		}
 
-		stage('Deploy to K8s') {
+		stage('4. Deploy to K8s') {
 			steps {
-				withCredentials([file(credentialsId: 'k8s-config', variable: 'KUBECONFIG')]) {
-					sh "kubectl --kubeconfig=${KUBECONFIG} apply -f deployment.yaml"
-					sh "kubectl --kubeconfig=${KUBECONFIG} rollout restart deployment/spring-app"
+				// Si ton fichier deployment.yaml est AUSSI dans spring-pipeline
+				dir('spring-pipeline') {
+					withCredentials([file(credentialsId: 'k8s-config', variable: 'KUBECONFIG')]) {
+						sh "kubectl --kubeconfig=${KUBECONFIG} apply -f deployment.yaml"
+						sh "kubectl --kubeconfig=${KUBECONFIG} rollout restart deployment/spring-app"
+					}
 				}
 			}
 		}
