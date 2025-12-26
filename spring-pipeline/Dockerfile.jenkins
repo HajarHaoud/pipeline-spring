@@ -1,0 +1,22 @@
+# On part de l'image Jenkins stable avec Java 17
+FROM jenkins/jenkins:lts-jdk17
+
+USER root
+
+# 1. Installation de Docker CLI (pour que Jenkins puisse créer des images)
+RUN apt-get update && apt-get install -y lsb-release && \
+    curl -fsSLo /usr/share/keyrings/docker-archive-keyring.asc \
+    https://download.docker.com/linux/debian/gpg && \
+    echo "deb [arch=$(dpkg --print-architecture) \
+    signed-by=/usr/share/keyrings/docker-archive-keyring.asc] \
+    https://download.docker.com/linux/debian $(lsb_release -cs) stable" > /etc/apt/sources.list.d/docker.list && \
+    apt-get update && apt-get install -y docker-ce-cli
+
+# 2. Installation de Maven (pour compiler ton application Spring)
+RUN apt-get install -y maven
+
+# 3. Installation de Kubectl (pour piloter Kubernetes)
+RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" \
+    && chmod +x kubectl && mv kubectl /usr/local/bin/
+
+USER jenkins
