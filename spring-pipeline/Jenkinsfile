@@ -13,31 +13,44 @@ pipeline {
 
 	stages {
 
-		stage('1. Diagnostic & Checkout') {
+		sstage('1. Checkout') {
 			steps {
 				git branch: 'main', url: 'https://github.com/HajarHaoud/pipeline-spring.git'
-				sh 'echo "--- Contenu du workspace après checkout ---"'
-				sh 'pwd'
-				sh 'ls -la'
 			}
 		}
 
-		stage('2. Build Maven') {
+		stage('2. Vérification Structure') {
 			steps {
-				sh 'mvn clean package -DskipTests'
-				// PAS de dir('spring-pipeline') car il n'existe pas dans le repo GitHub
+				sh '''
+                    echo "=== Structure du workspace ==="
+                    pwd
+                    ls -la
+                    echo "=== Contenu de spring-pipeline/ ==="
+                    ls -la spring-pipeline/
+                '''
 			}
 		}
 
-		stage('3. Build Docker') {
+		stage('3. Build Maven') {
 			steps {
-				withCredentials([usernamePassword(credentialsId: 'docker-hub-creds', passwordVariable: 'PASS', usernameVariable: 'USER')]) {
-					sh 'docker build -t hajarhaoud/spring-app:latest .'
-					sh "echo $PASS | docker login -u $USER --password-stdin"
-					sh 'docker push hajarhaoud/spring-app:latest'
+				dir('spring-pipeline') {  // ← C'est ici qu'il faut aller !
+					sh 'mvn clean package -DskipTests'
 				}
 			}
 		}
+
+		stage('5. Build Docker') {
+			steps {
+				dir('spring-pipeline') {  // ← Pareil pour Docker
+					withCredentials([usernamePassword(credentialsId: 'docker-hub-creds', passwordVariable: 'PASS', usernameVariable: 'USER')]) {
+						sh 'docker build -t hajarhaoud/spring-app:latest .'
+						sh "echo $PASS | docker login -u $USER --password-stdin"
+						sh 'docker push hajarhaoud/spring-app:latest'
+					}
+				}
+			}
+		}
+
 
 		stage('4. Deploy to K8s') {
 			steps {
