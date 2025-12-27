@@ -13,33 +13,45 @@ pipeline {
 
 	stages {
 
-		sstage('1. Checkout') {
+		stage('1. Checkout et Diagnostic') {
 			steps {
+				cleanWs()
 				git branch: 'main', url: 'https://github.com/HajarHaoud/pipeline-spring.git'
-			}
-		}
 
-		stage('2. Vérification Structure') {
-			steps {
 				sh '''
-                    echo "=== Structure du workspace ==="
-                    pwd
+                    echo "=== ARBORESCENCE COMPLÈTE ==="
+                    find . -type f -name "*.xml" -o -name "*.java" | head -30
+                    echo "=== ls -la racine ==="
                     ls -la
-                    echo "=== Contenu de spring-pipeline/ ==="
-                    ls -la spring-pipeline/
+                    echo "=== ls -la spring-pipeline/ si existe ==="
+                    ls -la spring-pipeline/ 2>/dev/null || echo "spring-pipeline/ n'existe pas"
+                    echo "=== Recherche pom.xml partout ==="
+                    find . -name "pom.xml" 2>/dev/null
                 '''
 			}
 		}
 
-		stage('3. Build Maven') {
+		stage('2. Build Maven') {
 			steps {
-				dir('spring-pipeline') {  // ← C'est ici qu'il faut aller !
-					sh 'mvn clean package -DskipTests'
+				script {
+					// Chercher dynamiquement où est le pom.xml
+					def pomPath = sh(script: 'find . -name "pom.xml" | head -1', returnStdout: true).trim()
+
+					if (pomPath) {
+						echo "📁 pom.xml trouvé à : ${pomPath}"
+						def projectDir = new File(pomPath).parent
+						dir(projectDir) {
+							sh 'pwd'
+							sh 'mvn clean package -DskipTests'
+						}
+					} else {
+						error "❌ Aucun pom.xml trouvé dans le workspace"
+					}
 				}
 			}
 		}
 
-		stage('5. Build Docker') {
+		stage('3. Build Docker') {
 			steps {
 				dir('spring-pipeline') {  // ← Pareil pour Docker
 					withCredentials([usernamePassword(credentialsId: 'docker-hub-creds', passwordVariable: 'PASS', usernameVariable: 'USER')]) {
