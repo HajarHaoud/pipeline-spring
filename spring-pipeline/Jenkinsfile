@@ -3,7 +3,7 @@ pipeline {
 
 	environment {
 		DOCKER_IMAGE = "hajarhaoud/spring-app"
-		DOCKER_HUB_CREDS = 'docker-hub-credentials'
+		DOCKER_HUB_CREDS = 'dockerhub-creds'
 	}
 
 	stages {
@@ -21,15 +21,13 @@ pipeline {
 			}
 		}
 
-		stage('Build & Push Docker Image') {
+		stage('3. Build & Push Docker') {
 			steps {
-				dir('sprin-pipeline'){
+				dir('spring-pipeline') {
 					script {
-						docker.withRegistry('', DOCKER_HUB_CREDS) {
-							def customImage = docker.build("${DOCKER_IMAGE}:${env.BUILD_ID}")
-							customImage.push()
-							customImage.push('latest')
-						}
+						// Juste build pour tester
+						sh 'docker build -t test-image .'
+						echo "✅ Build Docker réussi (push désactivé pour test)"
 					}
 				}
 			}
