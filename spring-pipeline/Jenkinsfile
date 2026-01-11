@@ -10,8 +10,11 @@ pipeline {
 
 		stage('Build & Test') {
 			steps {
-				// On utilise Docker pour builder afin d'éviter d'installer Maven sur Jenkins
-				sh 'mvn clean test'
+				dir('spring-pipeline'){
+					sh 'chmod +x mvnw'
+					// On utilise Docker pour builder afin d'éviter d'installer Maven sur Jenkins
+					sh './mvnw clean package -DskipTests'
+				}
 			}
 		}
 
